@@ -22,15 +22,20 @@ function hookpress_get_fields( $type ) {
 		else
 			$fields = array_merge($fields,$wpdb->get_col("show columns from $table"));
 	}
+
 	// if it's a POST, we have a URL for it as well.
 	if ($type == 'POST' || $type == 'PARENT_POST')
 		$fields[] = 'post_url';
+
 	if ($type == 'PARENT_POST')
 		$fields = array_map(create_function('$x','return "parent_$x";'),$fields);
+
 	if ($type == 'OLD_USER_OBJ')
 		$fields = array_map(create_function('$x','return "old_$x";'),$fields);
+
 	return array_unique($fields);
 }
+
 function hookpress_print_edit_webhook( $id ){
 ?>
 <?php
@@ -125,14 +130,17 @@ if ($desc['type'] == 'filter')
 </div>
 <?php
 }
+
 function hookpress_print_webhook_row( $id ) {
 #	$webhooks = get_option('hookpress_webhooks');
 	$webhooks = hookpress_get_hooks( );
 	$desc = $webhooks[$id];
+
 	if( !empty( $desc ) ):
 	
 	$is_active = $desc['enabled'];
 	$html_safe['id'] = esc_html( $id );
+
 	if ( $is_active ) :
 		$nonce_action = "<input type='hidden' id='action-nonce-{$html_safe['id']}' name='action-nonce-{$html_safe['id']}' value='" . wp_create_nonce( 'deactivate-webhook-' . $html_safe['id'] ) . "' />";
 		$action = '<a href="#" id="on'. $html_safe['id'] . '" title="' . __('Deactivate this webhook') . '" class="on">' . __('Deactivate') . '</a>';
@@ -141,6 +149,7 @@ function hookpress_print_webhook_row( $id ) {
 #		$action = '<a href="#'. $nonce_action . '" id="off'. $html_safe['id'] . '" title="' . __('Activate this webhook') . '" class="off">' . __('Activate') . '</a>';
 		$action = '<a href="#" id="off'. $html_safe['id'] . '" title="' . __('Activate this webhook') . '" class="off">' . __('Activate') . '</a>';
 	endif;
+
 	$nonce_delete = "<input type='hidden' id='delete-nonce-{$html_safe['id']}' name='delete-nonce-{$html_safe['id']}' value='" . wp_create_nonce( 'delete-webhook-' . $html_safe['id'] ) . "' />";
 	$delete = '<a href="#" id="delete'. $html_safe['id'] . '" title="' . __('Delete this webhook') . '" class="delete">' . __('Delete') . '</a>';
 	if( count( $desc['fields'] ) > 1 ) {
@@ -152,8 +161,10 @@ function hookpress_print_webhook_row( $id ) {
 	$edit = '<a href="#TB_inline?inlineId=hookpress-webhook&height=330&width=500" id="edit'. $html_safe['id'] . '" title="' . __('Edit this webhook') . '" class="thickbox edit">' . __('Edit') . '</a>';
 	
 	$activeornot = $desc['enabled'] ? 'active' : 'inactive';
+
 	$html_safe['hook'] = esc_html( $desc['hook'] );
 	$html_safe['url'] = esc_html( $desc['url'] );
+
 	echo "
 <tr id='$id' class='$activeornot'>
 	<td class='webhook-title'><strong>{$html_safe['hook']}</strong>
@@ -163,6 +174,7 @@ function hookpress_print_webhook_row( $id ) {
 </tr>\n";
 	endif;
 }
+
 function hookpress_print_webhooks_table() {
 	global $page;
 	$webhooks = null;
@@ -188,6 +200,7 @@ function hookpress_print_webhooks_table() {
 
 	<tbody class="webhooks">
 <?php
+
 	if ( !empty($webhooks) ) :
 	
 	foreach ( (array)$webhooks as $id => $desc) :
@@ -202,7 +215,9 @@ function hookpress_print_webhooks_table() {
 </table>
 <?php
 }
+
 // MAGIC
+
 function hookpress_register_hooks() {
 	global $hookpress_callbacks, $hookpress_actions, $hookpress_filters;
 	$hookpress_callbacks = array();
@@ -211,27 +226,33 @@ function hookpress_register_hooks() {
 	
 	if (!is_array( $all_hooks ) )
 		return;
+
 	foreach ( $all_hooks as $id => $desc) {
 		if (count($desc) && $desc['enabled']) {
 			$hookpress_callbacks[$id] = create_function('','
 				$args = func_get_args();
 				return hookpress_generic_action('.$id.',$args);
 			');
+
 			$arg_count = 0;
 			if (isset($desc['type']) && $desc['type'] == 'filter')
 				$arg_count = count($hookpress_filters[$desc['hook']]);
 			else
 				$arg_count = count($hookpress_actions[$desc['hook']]);
+
 			add_filter($desc['hook'], $hookpress_callbacks[$id], HOOKPRESS_PRIORITY, $arg_count);
 		}
 	}
 }
+
 function hookpress_generic_action($id,$args) {
 	global $hookpress_version, $wpdb, $hookpress_actions, $hookpress_filters, $wp_version;
 	
 	$webhooks = hookpress_get_hooks( );
 	$desc = $webhooks[$id];
+
 	do_action( 'hookpress_hook_fired', $desc );
+
 	$obj = array();
 	
 	// generate the expected argument names
@@ -246,6 +267,7 @@ function hookpress_generic_action($id,$args) {
 			case 'POST':
 			case 'ATTACHMENT':
 				$newobj = get_post($arg,ARRAY_A);
+
 				if ($arg_names[$i] == 'POST')
 					$newobj["post_url"] = get_permalink($newobj["ID"]);
 					
@@ -287,6 +309,7 @@ function hookpress_generic_action($id,$args) {
 	// take only the fields we care about
 	$obj_to_post = array_intersect_key($obj,array_flip($desc['fields']));
 	$obj_to_post['hook'] = $desc['hook'];
+	$obj_to_post['content'] = "Wir haben gerade eine neue Veranstaltung auf unserer Webseite veröffentlich:\n\n". $obj_to_post['post_content']. "\n\n". $obj_to_post['post_url'];
 	
 	$user_agent = "HookPress/{$hookpress_version} (compatible; WordPress {$wp_version}; +http://mitcho.com/code/hookpress/)";
 	
